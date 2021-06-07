@@ -5,6 +5,7 @@ from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators import (StageToRedshiftOperator, LoadFactOperator,
                                 LoadDimensionOperator, DataQualityOperator)
 from helpers import SqlQueries
+from airflow.operators.postgres_operator import PostgresOperator
 
 # AWS_KEY = os.environ.get('AWS_KEY')
 # AWS_SECRET = os.environ.get('AWS_SECRET')
@@ -14,7 +15,7 @@ default_args = {
     'start_date': datetime(2019, 1, 12),
 }
 
-dag = DAG('udac_example_dag',
+dag = DAG('project5_dag',
           default_args=default_args,
           description='Load and transform data in Redshift with Airflow',
           schedule_interval='0 * * * *'
@@ -22,14 +23,35 @@ dag = DAG('udac_example_dag',
 
 start_operator = DummyOperator(task_id='Begin_execution',  dag=dag)
 
+# Create tables (if they don't already exist) 
+#    as suggested in https://knowledge.udacity.com/questions/163614
+create_tables_task = PostgresOperator(
+  task_id="create_tables",
+  dag=dag,
+  sql='sql/create_tables.sql',
+  postgres_conn_id="redshift"
+)
+
 stage_events_to_redshift = StageToRedshiftOperator(
     task_id='Stage_events',
-    dag=dag
+    dag=dag,
+    table='staging_events',
+    redshift_conn_id='redshift',
+    aws_credentials_id='aws_credentials',
+    s3_bucket='udacity-dend',
+    s3_key='log_data',
+    json_format='s3://udacity-dend/log_json_path.json'
 )
 
 stage_songs_to_redshift = StageToRedshiftOperator(
     task_id='Stage_songs',
-    dag=dag
+    dag=dag,
+    table='staging_songs',
+    redshift_conn_id='redshift',
+    aws_credentials_id='aws_credentials',
+    s3_bucket='udacity-dend',
+    s3_key='song_data',
+    json_format='auto'
 )
 
 load_songplays_table = LoadFactOperator(
@@ -63,3 +85,6 @@ run_quality_checks = DataQualityOperator(
 )
 
 end_operator = DummyOperator(task_id='Stop_execution',  dag=dag)
+
+create_tables_task >> stage_events_to_redshift
+create_tables_task >> stage_songs_to_redshift
