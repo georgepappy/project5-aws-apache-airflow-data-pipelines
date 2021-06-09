@@ -13,7 +13,7 @@ class LoadFactOperator(BaseOperator):
                  aws_credentials_id='',
                  table='',
                  sql_string='',
-                 append='',
+                 append_only='',
                  *args, **kwargs):
 
         super(LoadFactOperator, self).__init__(*args, **kwargs)
@@ -22,7 +22,7 @@ class LoadFactOperator(BaseOperator):
         self.aws_credentials_id=aws_credentials_id
         self.table=table
         self.sql_string=sql_string
-        self.append = append
+        self.append_only = append_only
 
     def execute(self, context):
         aws_hook = AwsHook(self.aws_credentials_id)
@@ -34,7 +34,7 @@ class LoadFactOperator(BaseOperator):
                 {}
         '''.format(self.table, self.sql_string)
         
-        if not self.append:
+        if not self.append_only:
             self.log.info('Clearing data from Redshift fact table')
             redshift.run('DELETE FROM {}'.format(self.table))
             
